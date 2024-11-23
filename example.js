@@ -2,45 +2,67 @@
 
 const { exec } = require('child_process');
 const fs = require('fs');
+const path = require('path');
 
-function main() {
-  let specUrl = 'https://api.example.com/openapi.yaml';
-  let outputDir = './generated-client';
+const SPEC_URL = 'https://api.example.com/openapi.yaml';
+const OUTPUT_DIR = './generated-client';
 
-  // 폴더를 만드는 로직
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir);
+async function main() {
+  try {
+    createOutputDirectory(OUTPUT_DIR);
+    await fetchOpenAPISpec(SPEC_URL);
+    await generateClientCode('openapi.yaml', OUTPUT_DIR);
+    copyCustomConfig('./custom-config.ts', `${OUTPUT_DIR}/config.ts`);
+    cleanUpFiles(['openapi.yaml']);
+    console.log('TypeScript client generated successfully.');
+  } catch (error) {
+    console.error('Error:', error);
   }
+}
 
-  // OpenAPI 명세를 가져오는 로직
-  exec(`curl -o openapi.yaml ${specUrl}`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Error fetching OpenAPI spec: ${error}`);
-      return;
-    }
+function createOutputDirectory(dir) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir);
+  }
+}
 
-    // 클라이언트 코드 생성하는 로직
+function fetchOpenAPISpec(url) {
+  return new Promise((resolve, reject) => {
+    exec(`curl -o openapi.yaml ${url}`, (error) => {
+      if (error) {
+        reject(`Error fetching OpenAPI spec: ${error.message}`);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+function generateClientCode(specFile, outputDir) {
+  return new Promise((resolve, reject) => {
     exec(
-      `openapi-generator-cli generate -i openapi.yaml -g typescript-axios -o ${outputDir}`,
-      (error, stdout, stderr) => {
+      `openapi-generator-cli generate -i ${specFile} -g typescript-axios -o ${outputDir}`,
+      (error) => {
         if (error) {
-          console.error(`Error generating client code: ${error}`);
-          return;
+          reject(`Error generating client code: ${error.message}`);
+        } else {
+          resolve();
         }
-
-        // 파일 입력 처리를 하는 로직
-        fs.copyFileSync('./custom-config.ts', `${outputDir}/config.ts`);
-
-        // 더는 필요 없는 파일을 삭제하는 로직
-        fs.unlinkSync('openapi.yaml');
-
-        // 기타 방어 처리들이 혼합되어 있음
-        console.log('TypeScript client generated successfully.');
       }
     );
   });
+}
 
-  // 에러 처리가 부족하고 코드가 중첩되어 있음
+function copyCustomConfig(src, dest) {
+  fs.copyFileSync(src, dest);
+}
+
+function cleanUpFiles(files) {
+  files.forEach((file) => {
+    if (fs.existsSync(file)) {
+      fs.unlinkSync(file);
+    }
+  });
 }
 
 main();
