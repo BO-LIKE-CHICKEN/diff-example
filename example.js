@@ -12,9 +12,10 @@ async function main() {
     createOutputDirectory(OUTPUT_DIR);
     await fetchOpenAPISpec(SPEC_URL);
     await generateClientCode('openapi.yaml', OUTPUT_DIR);
+    await generateMswMocks('openapi.yaml', './msw-mocks'); // 새로운 기능 추가
     copyCustomConfig('./custom-config.ts', `${OUTPUT_DIR}/config.ts`);
     cleanUpFiles(['openapi.yaml']);
-    console.log('TypeScript client generated successfully.');
+    console.log('TypeScript client and MSW mocks generated successfully.');
   } catch (error) {
     console.error('Error:', error);
   }
@@ -62,6 +63,21 @@ function cleanUpFiles(files) {
     if (fs.existsSync(file)) {
       fs.unlinkSync(file);
     }
+  });
+}
+
+function generateMswMocks(specFile, outputDir) {
+  return new Promise((resolve, reject) => {
+    exec(
+      `msw-auto-mock -i ${specFile} -o ${outputDir}`,
+      (error) => {
+        if (error) {
+          reject(`Error generating MSW mocks: ${error.message}`);
+        } else {
+          resolve();
+        }
+      }
+    );
   });
 }
 
